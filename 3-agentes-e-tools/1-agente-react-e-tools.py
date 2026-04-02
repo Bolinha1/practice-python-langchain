@@ -50,26 +50,36 @@ def web_search(query: str) -> str:
     return f"Não foi possível localizar informações sobre '{query}' na base de dados."
 
 
-system_prompt = """Responda as questões da melhor maneira possível.
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+tools = [calculator, web_search]
 
-Utilize o seguinte formato ao raciocinar:
+tools_description = "\n".join([f"{t.name}: {t.description}" for t in tools])
+tool_names = ", ".join([t.name for t in tools])
+
+system_prompt = f"""Responda as questões da melhor maneira possível. Você tem acesso às seguintes ferramentas:
+
+{tools_description}
+
+Utilize o seguinte formato:
 
 Questão: a questão de entrada que você deve responder
-Através: seu raciocínio sobre o que fazer
-Action: a ação a ser tomada
+Pensamento: você deve sempre pensar sobre o que fazer
+Action: a ação a ser tomada, deve ser uma de [{tool_names}]
 Action Input: a entrada para a ação
 Observação: o resultado da ação
-... (este ciclo de Através/Action/Observação pode se repetir N vezes)
-Através: agora sei a resposta final
+... (este ciclo de Pensamento/Action/Observação pode se repetir N vezes)
+Pensamento: agora sei a resposta final
 Resposta Final: a resposta final para a questão original
 
 Regras:
 - Se você escolher uma Action, NÃO inclua a Resposta Final no mesmo passo.
 - Após Action e Action Input, pare e aguarde a Observação.
-- Nunca pesquise na internet. Use apenas as ferramentas fornecidas."""
+- Nunca pesquise na internet. Use apenas as ferramentas fornecidas.
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-tools = [calculator, web_search]
+Begin!
+
+Questão: {{input}}
+Pensamento:{{agent_scratchpad}}"""
 
 agent = create_agent(model=llm, tools=tools, system_prompt=system_prompt)
 
@@ -79,4 +89,8 @@ print(response["messages"][-1].content)
 
 # Exemplo de uso com uma questão que não pode ser respondida pelas ferramentas
 response = agent.invoke({"messages": [("human", "E qual é a raiz quadrada de 16?")]})
+print(response["messages"][-1].content)
+
+# Exemplo de uso com uma questão que não pode ser respondida pelas ferramentas
+response = agent.invoke({"messages": [("human", "O que é uma baleia?")]})
 print(response["messages"][-1].content)
