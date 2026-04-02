@@ -1,26 +1,24 @@
 from langchain_openai import ChatOpenAI
-from langchain.agents import Tool, create_react_agent, AgentExecutor
-from langchain_core.prompts import PromptTemplate
+from langchain.agents import create_agent
+from langchain_core.tools import tool
 from dotenv import load_dotenv
 load_dotenv()
 
 
-
-
-@Tool(name="Calculadora", description="Use esta ferramenta para resolver expressões matemáticas simples.")
+@tool
 def calculator(expression: str) -> str:
-    """Função simples para avaliar expressões matemáticas e retornar o resultado."""
+    """Use esta ferramenta para resolver expressões matemáticas simples."""
     try:
         result = str(eval(expression))
     except Exception as e:
         result = f"Erro ao avaliar a expressão: {e}"
-    
+
     return result
 
 
-@Tool(name="web_search", description="Voce é uma ferramenta de busca na web.")
+@tool
 def web_search(query: str) -> str:
-    """Função simulada para realizar uma busca na web e retornar um resultado fictício."""
+    """Use esta ferramenta para buscar a capital de um país."""
 
     capitais_mundiais = {
         "Brasil": "Brasília",
@@ -51,17 +49,14 @@ def web_search(query: str) -> str:
 
     return f"Não foi possível localizar informações sobre '{query}' na base de dados."
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-tools = [calculator, web_search]
 
-prompt = PromptTemplate.from_template("""Responda as questões da melhor maneira possível.
-Você tem acesso às seguintes ferramentas: {tools}
+system_prompt = """Responda as questões da melhor maneira possível.
 
 Utilize o seguinte formato ao raciocinar:
 
 Questão: a questão de entrada que você deve responder
 Através: seu raciocínio sobre o que fazer
-Action: a ação a ser tomada, deve ser uma de [{tool_names}]
+Action: a ação a ser tomada
 Action Input: a entrada para a ação
 Observação: o resultado da ação
 ... (este ciclo de Através/Action/Observação pode se repetir N vezes)
@@ -71,9 +66,17 @@ Resposta Final: a resposta final para a questão original
 Regras:
 - Se você escolher uma Action, NÃO inclua a Resposta Final no mesmo passo.
 - Após Action e Action Input, pare e aguarde a Observação.
-- Nunca pesquise na internet. Use apenas as ferramentas fornecidas.
+- Nunca pesquise na internet. Use apenas as ferramentas fornecidas."""
 
-Comece!
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+tools = [calculator, web_search]
 
-Questão: {input}
-Através: {agent_scratchpad}""")
+agent = create_agent(model=llm, tools=tools, system_prompt=system_prompt)
+
+# Exemplo de uso
+response = agent.invoke({"messages": [("human", "Qual é a capital do Brasil?")]})
+print(response["messages"][-1].content)
+
+# Exemplo de uso com uma questão que não pode ser respondida pelas ferramentas
+response = agent.invoke({"messages": [("human", "E qual é a raiz quadrada de 16?")]})
+print(response["messages"][-1].content)
